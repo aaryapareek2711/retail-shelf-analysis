@@ -18,8 +18,8 @@ training/images/train
 training/images/val
 training/labels/train
 training/labels/val
-
 The same trained weights will seamlessly integrate into the existing API.
+For demonstration purposes, pretrained YOLOv8 weights are used to validate the inference and deployment pipeline, while SKU-110K is intended for final fine-tuning.
 
 
 ## Model
@@ -49,4 +49,5 @@ The project is structured for deployment on **Modal** with GPU support (A10G). A
 
 ## Notes
 Due to resource and time constraints, full-scale training on SKU-110K and live GPU deployment were not executed. However, the system architecture and code are designed to support both seamlessly.
+
 
