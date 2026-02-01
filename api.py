@@ -9,6 +9,9 @@ app = FastAPI(title="Retail Shelf Detection API")
 # Load YOLO model once at startup
 model = YOLO("yolov8s.pt")
 
+@app.get("/")
+def root():
+    return {"message": "Retail Shelf Detection API is running"}
 
 @app.post("/predict")
 async def predict(image: UploadFile = File(...)):
@@ -61,3 +64,4 @@ async def predict(image: UploadFile = File(...)):
         "objects": objects,
         "visualization_path": output_path
     }
+
