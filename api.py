@@ -1,67 +1,76 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import Response
 from ultralytics import YOLO
-import shutil
-import os
-import uuid
+from PIL import Image
+import io
+import cv2
+import numpy as np
 
+# Initialize FastAPI app
 app = FastAPI(title="Retail Shelf Detection API")
 
-# Load YOLO model once at startup
+# Load YOLO model once
 model = YOLO("yolov8s.pt")
 
+
+# Root endpoint
 @app.get("/")
 def root():
     return {"message": "Retail Shelf Detection API is running"}
 
+
+# Prediction endpoint
 @app.post("/predict")
 async def predict(image: UploadFile = File(...)):
-    # Create required folders
-    os.makedirs("inputs", exist_ok=True)
-    os.makedirs("outputs", exist_ok=True)
 
-    # Save uploaded image
-    image_id = str(uuid.uuid4())
-    input_path = f"inputs/{image_id}.jpg"
-    output_path = f"outputs/{image_id}.jpg"
+    # Read uploaded image
+    image_bytes = await image.read()
+    pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    with open(input_path, "wb") as f:
-        shutil.copyfileobj(image.file, f)
-
-    # Run YOLO detection
+    # Run YOLO with tuned thresholds (IMPORTANT)
     results = model.predict(
-        source=input_path,
-        conf=0.05,
-        imgsz=640,
-        save=True
+        pil_image,
+        conf=0.4,     # higher confidence = fewer false boxes
+        iou=0.5,      #remove overlapping boxes
+        imgsz=640
     )
 
-    objects = []
+    # Convert image to NumPy (OpenCV format)
+    annotated = np.array(pil_image)
 
-    for r in results:
-        if r.boxes is None:
+    # Draw ONLY GREEN boxes
+    for box in results[0].boxes:
+        confidence = float(box.conf[0])
+
+        # Extra safety filter
+        if confidence < 0.4:
             continue
 
-        for box in r.boxes:
-            x1, y1, x2, y2 = box.xyxy[0].tolist()
-            confidence = float(box.conf[0])
+        x1, y1, x2, y2 = map(int, box.xyxy[0])
 
-            objects.append({
-                "bbox": [int(x1), int(y1), int(x2), int(y2)],
-                "confidence": round(confidence, 2),
-                "group_id": f"brand_{int(y1 // 100)}"
-# placeholder for now
-            })
+        color = (0, 255, 0)  # GREEN (BGR)
+        thickness = 2
 
-    # Find latest YOLO output image
-    detect_dir = "runs/detect"
-    latest_run = sorted(os.listdir(detect_dir))[-1]
-    predicted_image = os.path.join(detect_dir, latest_run, os.path.basename(input_path))
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
 
-    if os.path.exists(predicted_image):
-        shutil.copy(predicted_image, output_path)
+        cv2.putText(
+            annotated,
+            f"{confidence:.2f}",
+            (x1, y1 - 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            color,
+            1
+        )
 
-    return {
-        "objects": objects,
-        "visualization_path": output_path
-    }
+    # Convert back to image bytes
+    annotated_pil = Image.fromarray(annotated)
+    buffer = io.BytesIO()
+    annotated_pil.save(buffer, format="JPEG")
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="image/jpeg"
+    )
+
 
