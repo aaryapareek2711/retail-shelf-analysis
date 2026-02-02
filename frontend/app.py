@@ -3,7 +3,7 @@ import requests
 
 st.set_page_config(page_title="Retail Shelf Analysis", layout="centered")
 
-st.title("🛒 Retail Shelf Analysis")
+st.title(" Retail Shelf Analysis")
 
 uploaded = st.file_uploader(
     "Upload shelf image",
@@ -29,4 +29,5 @@ if uploaded:
         )
     else:
         st.error("Prediction failed. Please try again.")
+
 
